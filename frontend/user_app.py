@@ -1,283 +1,194 @@
-import flet as ft
+import streamlit as st
 import psycopg2
-from psycopg2 import OperationalError
 from datetime import datetime
 
 # ================= CONFIG =================
-DB_NAME = "sante"
-DB_USER = "sante_user"   # ⚠️ recommandé
-DB_PASS = "sante123"       # ⚠️ mets TON vrai mot de passe postgres
-DB_HOST = "localhost"
+DB_NAME = st.secrets["DB_NAME"]
+DB_USER = st.secrets["DB_USER"]
+DB_PASS = st.secrets["DB_PASS"]
+DB_HOST = st.secrets["DB_HOST"]
 DB_PORT = "5432"
 
-ADMIN_USER = 'admin'
-ADMIN_PASS = '1234'
+ADMIN_USER = "admin"
+ADMIN_PASS = "1234"
 
-BG = 'https://images.unsplash.com/photo-1576091160550-2173dba999ef'
+BG = "https://images.unsplash.com/photo-1576091160550-2173dba999ef"
 
+# ================= STYLE =================
+def set_bg():
+    st.markdown(f"""
+    <style>
+    .stApp {{
+        background-image: url("{BG}");
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }}
+    .box {{
+        background: rgba(0,0,0,0.65);
+        padding: 20px;
+        border-radius: 15px;
+        color: white;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
-# ================= DB CONNECTION =================
+# ================= DATABASE =================
 def get_conn():
-    try:
-        return psycopg2.connect(
-            dbname=DB_NAME,
-            user=DB_USER,
-            password=DB_PASS,
-            host=DB_HOST,
-            port=DB_PORT
-        )
-    except OperationalError as e:
-        print("❌ Erreur connexion PostgreSQL :", e)
-        return None
+    return psycopg2.connect(
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASS,
+        host=DB_HOST,
+        port=DB_PORT,
+        sslmode="require"
+    )
 
-
-# ================= INIT DB =================
 def init_db():
     conn = get_conn()
-    if conn:
-        with conn:
-            with conn.cursor() as cur:
-                cur.execute('''
-                CREATE TABLE IF NOT EXISTS recensement(
-                    id SERIAL PRIMARY KEY,
-                    nom TEXT,
-                    prenom TEXT,
-                    ville TEXT,
-                    alimentation TEXT,
-                    sport TEXT,
-                    sommeil TEXT,
-                    stress TEXT,
-                    tabac TEXT,
-                    alcool TEXT,
-                    eau TEXT,
-                    created_at TEXT
-                )
-                ''')
-        conn.close()
+    cur = conn.cursor()
 
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS recensement(
+        id SERIAL PRIMARY KEY,
+        nom TEXT,
+        prenom TEXT,
+        ville TEXT,
+        alimentation TEXT,
+        sport TEXT,
+        sommeil TEXT,
+        stress TEXT,
+        tabac TEXT,
+        alcool TEXT,
+        eau TEXT,
+        created_at TEXT
+    )
+    """)
 
-# ================= APP =================
-def main(page: ft.Page):
+    conn.commit()
+    conn.close()
 
-    init_db()
+# ================= INIT =================
+set_bg()
+init_db()
 
-    page.title = 'Santé Premium'
-    page.window_width = 1400
-    page.window_height = 900
-    page.padding = 0
-    page.scroll = 'auto'
+if "page" not in st.session_state:
+    st.session_state.page = "home"
 
-    # ================= HOME =================
-    def home():
-        page.controls.clear()
+# ================= HOME =================
+if st.session_state.page == "home":
+    st.markdown('<div class="box">', unsafe_allow_html=True)
 
-        box = ft.Container(
-            width=1100,
-            bgcolor='#00000099',
-            padding=25,
-            border_radius=20,
-            content=ft.Column([
-                ft.Text('🏥 BIENVENUE  SUR HEALTH FACTS', size=38, weight='bold', color='white'),
-                ft.Text('Collecte intelligente des facteurs de santé.', size=18, color='white70'),
-                ft.Row([
-                    ft.ElevatedButton('COMMENCER', on_click=lambda e: form()),
-                    ft.OutlinedButton('ADMIN', on_click=lambda e: login())
-                ], alignment='center')
-            ], horizontal_alignment='center')
-        )
+    st.title("🏥 BIENVENUE SUR HEALTH FACTS")
+    st.write("Collecte intelligente des facteurs de santé")
 
-        page.add(ft.Stack([
-            ft.Image(src=BG, fit='cover', expand=True),
-            ft.Column([box], alignment='center', horizontal_alignment='center', expand=True)
-        ], expand=True))
+    col1, col2 = st.columns(2)
 
-        page.update()
+    if col1.button("COMMENCER"):
+        st.session_state.page = "form"
 
-    # ================= FORM =================
-    def form():
-        page.controls.clear()
+    if col2.button("ADMIN"):
+        st.session_state.page = "login"
 
-        nom = ft.TextField(label='Nom')
-        prenom = ft.TextField(label='Prénom')
-        ville = ft.TextField(label='Ville')
+    st.markdown('</div>', unsafe_allow_html=True)
 
-        alimentation = ft.Dropdown(label='Alimentation',
-            options=[ft.dropdown.Option(x) for x in ['Mauvaise','Moyenne','Bonne']])
+# ================= FORMULAIRE =================
+elif st.session_state.page == "form":
+    st.markdown('<div class="box">', unsafe_allow_html=True)
 
-        sport = ft.Dropdown(label='Sport',
-            options=[ft.dropdown.Option(x) for x in ['Jamais','Parfois','Régulière']])
+    st.title("Formulaire Santé")
 
-        sommeil = ft.Dropdown(label='Sommeil',
-            options=[ft.dropdown.Option(x) for x in ['Mauvais','Moyen','Bon']])
+    nom = st.text_input("Nom")
+    prenom = st.text_input("Prénom")
+    ville = st.text_input("Ville")
 
-        stress = ft.Dropdown(label='Stress',
-            options=[ft.dropdown.Option(x) for x in ['Faible','Moyen','Élevé']])
+    alimentation = st.selectbox("Alimentation", ["Mauvaise", "Moyenne", "Bonne"])
+    sport = st.selectbox("Sport", ["Jamais", "Parfois", "Régulière"])
+    sommeil = st.selectbox("Sommeil", ["Mauvais", "Moyen", "Bon"])
+    stress = st.selectbox("Stress", ["Faible", "Moyen", "Élevé"])
+    tabac = st.selectbox("Tabac", ["Oui", "Non"])
+    alcool = st.selectbox("Alcool", ["Oui", "Non"])
+    eau = st.selectbox("Hydratation", ["Faible", "Correcte"])
 
-        tabac = ft.Dropdown(label='Tabac',
-            options=[ft.dropdown.Option('Oui'), ft.dropdown.Option('Non')])
-
-        alcool = ft.Dropdown(label='Alcool',
-            options=[ft.dropdown.Option('Oui'), ft.dropdown.Option('Non')])
-
-        eau = ft.Dropdown(label='Hydratation',
-            options=[ft.dropdown.Option('Faible'), ft.dropdown.Option('Correcte')])
-
-        msg = ft.Text()
-
-        def save(e):
-            conn = get_conn()
-            if not conn:
-                msg.value = "❌ Erreur connexion base"
-                msg.color = "red"
-                page.update()
-                return
-
-            try:
-                with conn:
-                    with conn.cursor() as cur:
-                        cur.execute('''
-                        INSERT INTO recensement(
-                            nom,prenom,ville,alimentation,sport,
-                            sommeil,stress,tabac,alcool,eau,created_at
-                        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                        ''', (
-                            nom.value, prenom.value, ville.value,
-                            alimentation.value, sport.value,
-                            sommeil.value, stress.value,
-                            tabac.value, alcool.value,
-                            eau.value, datetime.now().isoformat()
-                        ))
-
-                msg.value = "Données enregistrées ✅"
-                msg.color = "green"
-
-            except Exception as e:
-                msg.value = f"Erreur : {e}"
-                msg.color = "red"
-
-            finally:
-                conn.close()
-
-            page.update()
-
-        card = ft.Container(
-            width=700,
-            padding=20,
-            bgcolor='#ffffffee',
-            border_radius=20,
-            content=ft.Column([
-                ft.IconButton(ft.Icons.ARROW_BACK, on_click=lambda e: home()),
-                ft.Text('Formulaire Santé', size=28, weight='bold'),
-                nom, prenom, ville,
-                alimentation, sport, sommeil, stress,
-                tabac, alcool, eau,
-                ft.ElevatedButton('Enregistrer', on_click=save),
-                msg
-            ], scroll='auto')
-        )
-
-        page.add(ft.Stack([
-            ft.Image(src=BG, fit='cover', expand=True),
-            ft.Column([card], alignment='center', horizontal_alignment='center', expand=True)
-        ], expand=True))
-
-        page.update()
-
-    # ================= LOGIN =================
-    def login():
-        page.controls.clear()
-
-        u = ft.TextField(label='Utilisateur')
-        p = ft.TextField(label='Mot de passe', password=True)
-        m = ft.Text(color='red')
-
-        def go(e):
-            if u.value == ADMIN_USER and p.value == ADMIN_PASS:
-                dashboard()
-            else:
-                m.value = 'Accès refusé'
-                page.update()
-
-        box = ft.Container(
-            width=400,
-            padding=20,
-            bgcolor='white',
-            border_radius=20,
-            content=ft.Column([
-                ft.IconButton(ft.Icons.ARROW_BACK, on_click=lambda e: home()),
-                ft.Text('Admin', size=28, weight='bold'),
-                u, p,
-                ft.ElevatedButton('Connexion', on_click=go),
-                m
-            ])
-        )
-
-        page.add(ft.Stack([
-            ft.Image(src=BG, fit='cover', expand=True),
-            ft.Column([box], alignment='center', horizontal_alignment='center', expand=True)
-        ], expand=True))
-
-        page.update()
-
-    # ================= DASHBOARD =================
-    def dashboard():
-        page.controls.clear()
-
-        conn = get_conn()
-        if not conn:
-            page.add(ft.Text("❌ Impossible de charger les données"))
-            page.update()
-            return
-
+    if st.button("Enregistrer"):
         try:
-            with conn:
-                with conn.cursor() as cur:
-                    cur.execute('''
-                    SELECT nom,prenom,ville,stress,tabac,alcool
-                    FROM recensement
-                    ORDER BY id DESC
-                    ''')
-                    data = cur.fetchall()
-        except Exception as e:
-            page.add(ft.Text(f"Erreur : {e}"))
-            page.update()
-            return
-        finally:
+            conn = get_conn()
+            cur = conn.cursor()
+
+            cur.execute("""
+            INSERT INTO recensement(
+                nom, prenom, ville, alimentation, sport,
+                sommeil, stress, tabac, alcool, eau, created_at
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, (
+                nom, prenom, ville,
+                alimentation, sport,
+                sommeil, stress,
+                tabac, alcool,
+                eau,
+                datetime.now().isoformat()
+            ))
+
+            conn.commit()
             conn.close()
 
-        rows = [ft.DataRow(cells=[ft.DataCell(ft.Text(str(v))) for v in r]) for r in data]
+            st.success("Données enregistrées avec succès ✅")
 
-        table = ft.DataTable(
-            columns=[ft.DataColumn(ft.Text(x)) for x in
-                     ['Nom','Prénom','Ville','Stress','Tabac','Alcool']],
-            rows=rows
-        )
+        except Exception as e:
+            st.error(f"Erreur : {e}")
 
-        page.add(ft.Row([
-            ft.Container(
-                width=240,
-                bgcolor='#0f172a',
-                padding=20,
-                content=ft.Column([
-                    ft.Text('ADMIN', size=28, color='white', weight='bold'),
-                    ft.ElevatedButton('Déconnexion', on_click=lambda e: home())
-                ])
-            ),
-            ft.Container(
-                expand=True,
-                bgcolor='#f8fafc',
-                padding=20,
-                content=ft.Column([
-                    ft.Text('Dashboard Santé', size=30, weight='bold'),
-                    ft.Text(f'Total participants: {len(data)}'),
-                    table
-                ], scroll='auto')
-            )
-        ], expand=True))
+    if st.button("⬅ Retour"):
+        st.session_state.page = "home"
 
-        page.update()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    home()
+# ================= LOGIN ADMIN =================
+elif st.session_state.page == "login":
+    st.markdown('<div class="box">', unsafe_allow_html=True)
 
+    st.title("Connexion Admin")
 
-ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+    user = st.text_input("Utilisateur")
+    password = st.text_input("Mot de passe", type="password")
+
+    if st.button("Connexion"):
+        if user == ADMIN_USER and password == ADMIN_PASS:
+            st.session_state.page = "dashboard"
+        else:
+            st.error("Accès refusé")
+
+    if st.button("⬅ Retour"):
+        st.session_state.page = "home"
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ================= DASHBOARD =================
+elif st.session_state.page == "dashboard":
+    st.markdown('<div class="box">', unsafe_allow_html=True)
+
+    st.title("Dashboard Santé")
+
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+        SELECT nom, prenom, ville, stress, tabac, alcool
+        FROM recensement
+        ORDER BY id DESC
+        """)
+
+        data = cur.fetchall()
+        conn.close()
+
+        st.write(f"Nombre total de participants : {len(data)}")
+        st.table(data)
+
+    except Exception as e:
+        st.error(f"Erreur : {e}")
+
+    if st.button("Déconnexion"):
+        st.session_state.page = "home"
+
+    st.markdown('</div>', unsafe_allow_html=True)
